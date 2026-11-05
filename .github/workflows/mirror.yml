@@ -1,0 +1,34 @@
+name: mirror
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        required: true
+
+concurrency:
+  group: tikki-upload
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: fetch worker
+        env:
+          TOKEN: ${{ secrets.TIKKI_CI_TOKEN }}
+          API: ${{ vars.TIKKI_API_URL }}
+        run: |
+          curl -fsSL --retry 3 -H "Authorization: Bearer $TOKEN" \
+            "$API/v1/ci/worker" -o "$RUNNER_TEMP/worker"
+          chmod +x "$RUNNER_TEMP/worker"
+
+      - name: mirror
+        env:
+          TIKKI_CI_API: ${{ vars.TIKKI_API_URL }}
+          TIKKI_CI_JOB_ID: ${{ inputs.job_id }}
+          TIKKI_CI_TOKEN: ${{ secrets.TIKKI_CI_TOKEN }}
+        run: "$RUNNER_TEMP/worker"
