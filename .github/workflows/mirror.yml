@@ -31,10 +31,14 @@ jobs:
             "$API/v1/ci/worker" -o "$RUNNER_TEMP/worker"
           chmod +x "$RUNNER_TEMP/worker"
 
-      - name: net sampler
+      - name: mirror
+        env:
+          TIKKI_CI_API: ${{ vars.TIKKI_API_URL }}
+          TIKKI_CI_JOB_ID: ${{ inputs.job_id }}
+          TIKKI_CI_TOKEN: ${{ secrets.TIKKI_CI_TOKEN }}
         run: |
-          nohup bash -c '
-            iface=$(ip route show default | awk "{print \$5; exit}")
+          iface=$(ip route show default | awk '{print $5; exit}')
+          (
             prev_rx=$(cat /sys/class/net/$iface/statistics/rx_bytes)
             prev_tx=$(cat /sys/class/net/$iface/statistics/tx_bytes)
             while true; do
@@ -44,12 +48,5 @@ jobs:
               echo "net down $(( (rx-prev_rx)*8/10/1000000 )) Mbps up $(( (tx-prev_tx)*8/10/1000000 )) Mbps"
               prev_rx=$rx; prev_tx=$tx
             done
-          ' > "$RUNNER_TEMP/net.log" 2>&1 &
-          (while true; do sleep 10; tail -n 1 "$RUNNER_TEMP/net.log"; done) &
-
-      - name: mirror
-        env:
-          TIKKI_CI_API: ${{ vars.TIKKI_API_URL }}
-          TIKKI_CI_JOB_ID: ${{ inputs.job_id }}
-          TIKKI_CI_TOKEN: ${{ secrets.TIKKI_CI_TOKEN }}
-        run: "$RUNNER_TEMP/worker"
+          ) &
+          "$RUNNER_TEMP/worker"
